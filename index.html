@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="アイデア箱">
+<title>アイデア箱</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23E8833A'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%F0%9F%92%A1%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23E8833A'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%F0%9F%92%A1%3C/text%3E%3C/svg%3E">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<style>
+  :root{
+    --bg:#FFF8F0;
+    --card:#FFFFFF;
+    --accent:#E8833A;
+    --accent-dark:#C9631E;
+    --accent-soft:#FCE8D5;
+    --text:#3A2E24;
+    --text-sub:#8C7B6B;
+    --border:#F0E0CD;
+    --green:#7FA86B;
+    --red:#D9704F;
+    --shadow: 0 2px 10px rgba(120,80,30,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding-bottom:90px;
+  }
+  header{
+    position:sticky;top:0;z-index:10;
+    background:linear-gradient(135deg,var(--accent),var(--accent-dark));
+    color:#fff;
+    padding:18px 16px 16px;
+    box-shadow:var(--shadow);
+  }
+  header h1{margin:0;font-size:20px;display:flex;align-items:center;gap:8px;}
+  header p{margin:4px 0 0;font-size:12px;opacity:0.9;}
+  .stats{
+    display:flex;gap:8px;margin-top:12px;
+  }
+  .stat-chip{
+    background:rgba(255,255,255,0.18);
+    border-radius:10px;
+    padding:6px 10px;
+    font-size:11px;
+  }
+  .stat-chip b{font-size:15px;display:block;}
+  .toolbar{
+    padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;
+  }
+  .toolbar input, .toolbar select{
+    border:1px solid var(--border);
+    background:#fff;
+    border-radius:10px;
+    padding:8px 10px;
+    font-size:13px;
+    color:var(--text);
+  }
+  .toolbar input[type=text]{flex:1;min-width:140px;}
+  #list{padding:0 16px;display:flex;flex-direction:column;gap:10px;}
+  .empty{
+    text-align:center;color:var(--text-sub);padding:60px 20px;font-size:14px;
+  }
+  .card{
+    background:var(--card);
+    border-radius:16px;
+    padding:14px 16px;
+    box-shadow:var(--shadow);
+    border:1px solid var(--border);
+    cursor:pointer;
+    transition:transform .1s;
+  }
+  .card:active{transform:scale(0.98);}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .card-title{font-weight:700;font-size:15px;line-height:1.4;}
+  .status-badge{
+    font-size:10px;padding:3px 8px;border-radius:20px;white-space:nowrap;font-weight:600;
+  }
+  .status-未着手{background:#EEE;color:#888;}
+  .status-検討中{background:var(--accent-soft);color:var(--accent-dark);}
+  .status-実装中{background:#DCEAF7;color:#3A72A8;}
+  .status-実装済{background:#E3EFDC;color:var(--green);}
+  .card-combo{
+    font-size:13px;color:var(--text-sub);margin-top:6px;line-height:1.5;
+  }
+  .card-combo b{color:var(--text);font-weight:600;}
+  .card-meta{
+    display:flex;gap:10px;margin-top:8px;font-size:11px;color:var(--text-sub);flex-wrap:wrap;
+  }
+  .card-meta span{display:flex;align-items:center;gap:3px;}
+
+  .fab{
+    position:fixed;right:20px;bottom:24px;
+    width:56px;height:56px;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent-dark));
+    color:#fff;font-size:28px;border:none;
+    box-shadow:0 4px 14px rgba(200,100,30,0.4);
+    display:flex;align-items:center;justify-content:center;
+    z-index:20;cursor:pointer;
+  }
+
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(40,25,10,0.45);
+    display:none;align-items:flex-end;justify-content:center;z-index:100;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal{
+    background:var(--bg);
+    width:100%;max-width:560px;
+    max-height:92vh;overflow-y:auto;
+    border-radius:20px 20px 0 0;
+    padding:18px 18px 30px;
+    animation:slideUp .2s ease-out;
+  }
+  @keyframes slideUp{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .modal-header{
+    display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;
+  }
+  .modal-header h2{margin:0;font-size:17px;}
+  .close-btn{
+    background:none;border:none;font-size:22px;color:var(--text-sub);cursor:pointer;padding:4px 8px;
+  }
+  .section{
+    background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:14px;margin-bottom:12px;
+  }
+  .section h3{
+    margin:0 0 10px;font-size:13px;color:var(--accent-dark);display:flex;align-items:center;gap:6px;
+  }
+  label{display:block;font-size:11px;color:var(--text-sub);margin:8px 0 3px;}
+  label:first-child{margin-top:0;}
+  input[type=text],input[type=datetime-local],input[type=date],textarea,select{
+    width:100%;border:1px solid var(--border);border-radius:10px;
+    padding:9px 10px;font-size:14px;background:#fff;color:var(--text);
+    font-family:inherit;
+  }
+  textarea{resize:vertical;min-height:44px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .location-row{display:flex;gap:8px;align-items:flex-end;}
+  .location-row > div{flex:1;}
+  .gps-btn{
+    background:var(--accent-soft);color:var(--accent-dark);border:none;border-radius:10px;
+    padding:9px 12px;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;
+  }
+  .gps-status{font-size:11px;color:var(--text-sub);margin-top:4px;}
+
+  .repeat-row{
+    display:flex;gap:6px;margin-bottom:6px;align-items:center;
+  }
+  .repeat-row input, .repeat-row textarea{flex:1;}
+  .repeat-row input[type=checkbox]{flex:none;width:18px;height:18px;}
+  .del-row{
+    background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:2px 6px;flex:none;
+  }
+  .add-row-btn{
+    background:none;border:1px dashed var(--accent);color:var(--accent-dark);
+    border-radius:10px;padding:6px 10px;font-size:12px;cursor:pointer;width:100%;margin-top:2px;
+  }
+  .log-item{
+    font-size:12px;border-bottom:1px dashed var(--border);padding:6px 0;
+  }
+  .log-item .log-date{color:var(--accent-dark);font-weight:600;margin-right:6px;}
+
+  .modal-actions{
+    display:flex;gap:8px;margin-top:16px;
+  }
+  .btn{
+    flex:1;padding:12px;border-radius:12px;border:none;font-size:14px;font-weight:700;cursor:pointer;
+  }
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;}
+  .btn-secondary{background:#fff;border:1px solid var(--border);color:var(--text-sub);}
+  .btn-danger{background:#fff;border:1px solid var(--red);color:var(--red);flex:none;}
+
+  .setup-box{
+    margin:16px;padding:16px;background:#fff;border-radius:14px;border:1px solid var(--border);font-size:13px;line-height:1.7;
+  }
+  .setup-box textarea{height:110px;font-family:monospace;font-size:12px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💡 アイデア箱</h1>
+  <p>ふと思いついたビジネスアイデアをストックする</p>
+  <div class="stats">
+    <div class="stat-chip"><b id="stat-total">0</b>件</div>
+    <div class="stat-chip"><b id="stat-doing">0</b>検討中</div>
+    <div class="stat-chip"><b id="stat-done">0</b>実装済</div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <input type="text" id="searchInput" placeholder="キーワード検索（組合せ・対象・価値など）">
+  <select id="statusFilter">
+    <option value="">全ステータス</option>
+    <option value="未着手">未着手</option>
+    <option value="検討中">検討中</option>
+    <option value="実装中">実装中</option>
+    <option value="実装済">実装済</option>
+  </select>
+</div>
+
+<div id="list"></div>
+
+<button class="fab" onclick="openModal()">＋</button>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">新しいアイデア</h2>
+      <button class="close-btn" onclick="closeModal()">×</button>
+    </div>
+
+    <div class="section">
+      <h3>📌 基本情報</h3>
+      <label>タイトル（一覧表示用の短い呼び名）</label>
+      <input type="text" id="f-title" placeholder="例：空き店舗×高齢者見守りサービス">
+
+      <label>ステータス</label>
+      <select id="f-status">
+        <option value="未着手">未着手</option>
+        <option value="検討中">検討中</option>
+        <option value="実装中">実装中</option>
+        <option value="実装済">実装済</option>
+      </select>
+
+      <label>思いついた日時</label>
+      <input type="datetime-local" id="f-datetime">
+
+      <div class="location-row">
+        <div>
+          <label>思いついた場所（市町村名）</label>
+          <input type="text" id="f-location" placeholder="例：東京都町田市">
+        </div>
+        <button class="gps-btn" onclick="getLocation()">📍現在地取得</button>
+      </div>
+      <div class="gps-status" id="gpsStatus"></div>
+    </div>
+
+    <div class="section">
+      <h3>🔗 アイデアの中身</h3>
+      <div class="row2">
+        <div>
+          <label>組み合わせるもの A</label>
+          <input type="text" id="f-elemA" placeholder="例：光ファイバー網">
+        </div>
+        <div>
+          <label>組み合わせるもの B</label>
+          <input type="text" id="f-elemB" placeholder="例：見守りセンサー">
+        </div>
+      </div>
+      <label>誰に</label>
+      <input type="text" id="f-target" placeholder="例：単身高齢者を抱える自治体">
+      <label>どのような価値を提供するか</label>
+      <textarea id="f-value" placeholder="例：既存インフラを転用し低コストで異常検知・通報を実現する"></textarea>
+    </div>
+
+    <div class="section">
+      <h3>🗂 使う情報とその所有者</h3>
+      <div id="infoList"></div>
+      <button class="add-row-btn" onclick="addInfoRow()">＋ 情報を追加</button>
+    </div>
+
+    <div class="section">
+      <h3>🚩 社会実装までのマイルストーン</h3>
+      <div id="milestoneList"></div>
+      <button class="add-row-btn" onclick="addMilestoneRow()">＋ マイルストーンを追加</button>
+    </div>
+
+    <div class="section">
+      <h3>📝 改版ログ</h3>
+      <div id="logList"></div>
+      <label>今回の変更内容（保存時にログへ追加されます）</label>
+      <textarea id="f-newlog" placeholder="例：自治体ヒアリングを踏まえ対象を高齢者見守りに絞り込み"></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="deleteBtn" onclick="deleteIdea()" style="display:none;">削除</button>
+      <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveIdea()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==== Firebase設定 ====
+const firebaseConfig = {
+  apiKey: "AIzaSyAxVn7JUuoBsNeSODksNYyEkd2W2E252_c",
+  authDomain: "life--log.firebaseapp.com",
+  databaseURL: "https://life--log-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "life--log",
+  storageBucket: "life--log.firebasestorage.app",
+  messagingSenderId: "790653257684",
+  appId: "1:790653257684:web:dd84bf5e0a38db328f3841"
+};
+const DB_PATH = 'ideabox'; // セキュリティルールのノード名に合わせる
+
+let db = null;
+let ideas = {};
+let editingId = null;
+let useLocalStorage = false;
+
+function initFirebase(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    firebase.auth().signInAnonymously().catch(err => {
+      console.warn("匿名認証に失敗したためローカル保存モードで動作します", err);
+      useLocalStorage = true;
+      loadLocal();
+      render();
+    });
+    firebase.auth().onAuthStateChanged(user => {
+      if(user && !useLocalStorage){
+        db.ref(DB_PATH).on('value', snap => {
+          ideas = snap.val() || {};
+          render();
+        });
+      }
+    });
+  }catch(e){
+    console.warn("Firebase初期化に失敗したためローカル保存モードで動作します", e);
+    useLocalStorage = true;
+    loadLocal();
+    render();
+  }
+}
+
+function loadLocal(){
+  try{
+    ideas = JSON.parse(localStorage.getItem('idea-box-data') || '{}');
+  }catch(e){ ideas = {}; }
+}
+function saveLocal(){
+  localStorage.setItem('idea-box-data', JSON.stringify(ideas));
+}
+
+function uid(){
+  return 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
+}
+
+// ==== レンダリング ====
+function render(){
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+  const statusFilter = document.getElementById('statusFilter').value;
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+
+  let arr = Object.entries(ideas).map(([id,v]) => ({id, ...v}));
+  arr.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
+
+  document.getElementById('stat-total').textContent = arr.length;
+  document.getElementById('stat-doing').textContent = arr.filter(i=>i.status==='検討中').length;
+  document.getElementById('stat-done').textContent = arr.filter(i=>i.status==='実装済').length;
+
+  if(statusFilter) arr = arr.filter(i => i.status === statusFilter);
+  if(search){
+    arr = arr.filter(i => {
+      const blob = [i.title,i.elemA,i.elemB,i.target,i.value,i.location].join(' ').toLowerCase();
+      return blob.includes(search);
+    });
+  }
+
+  if(arr.length === 0){
+    list.innerHTML = '<div class="empty">まだアイデアがありません。<br>右下の＋から最初のアイデアを登録しましょう。</div>';
+    return;
+  }
+
+  arr.forEach(idea => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.onclick = () => openModal(idea.id);
+    const dt = idea.datetime ? formatDT(idea.datetime) : '';
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="card-title">${escapeHtml(idea.title || '（無題のアイデア）')}</div>
+        <div class="status-badge status-${idea.status||'未着手'}">${idea.status||'未着手'}</div>
+      </div>
+      <div class="card-combo"><b>${escapeHtml(idea.elemA||'')}</b> × <b>${escapeHtml(idea.elemB||'')}</b> → ${escapeHtml(idea.target||'')}に価値提供</div>
+      <div class="card-meta">
+        <span>🕒 ${dt}</span>
+        <span>📍 ${escapeHtml(idea.location||'未設定')}</span>
+        <span>🚩 ${(idea.milestones||[]).length}件</span>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function formatDT(v){
+  const d = new Date(v);
+  if(isNaN(d)) return v;
+  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ==== モーダル ====
+function openModal(id){
+  editingId = id || null;
+  const idea = id ? ideas[id] : null;
+
+  document.getElementById('modalTitle').textContent = id ? 'アイデアを編集' : '新しいアイデア';
+  document.getElementById('deleteBtn').style.display = id ? 'block' : 'none';
+
+  document.getElementById('f-title').value = idea?.title || '';
+  document.getElementById('f-status').value = idea?.status || '未着手';
+  document.getElementById('f-datetime').value = idea?.datetime || nowLocal();
+  document.getElementById('f-location').value = idea?.location || '';
+  document.getElementById('f-elemA').value = idea?.elemA || '';
+  document.getElementById('f-elemB').value = idea?.elemB || '';
+  document.getElementById('f-target').value = idea?.target || '';
+  document.getElementById('f-value').value = idea?.value || '';
+  document.getElementById('f-newlog').value = '';
+  document.getElementById('gpsStatus').textContent = '';
+
+  renderInfoRows(idea?.info || []);
+  renderMilestoneRows(idea?.milestones || []);
+  renderLogList(idea?.logs || []);
+
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+function nowLocal(){
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0,16);
+}
+
+// ==== 使う情報リスト ====
+function renderInfoRows(rows){
+  const wrap = document.getElementById('infoList');
+  wrap.innerHTML = '';
+  if(rows.length === 0) rows = [{info:'',owner:''}];
+  rows.forEach(r => addInfoRow(r.info, r.owner));
+}
+function addInfoRow(info='', owner=''){
+  const wrap = document.getElementById('infoList');
+  const row = document.createElement('div');
+  row.className = 'repeat-row';
+  row.innerHTML = `
+    <input type="text" placeholder="使う情報（例：水道使用量データ）" class="info-info" value="${escapeHtml(info)}">
+    <input type="text" placeholder="所有者（例：市上下水道局）" class="info-owner" value="${escapeHtml(owner)}">
+    <button class="del-row" onclick="this.parentElement.remove()">×</button>
+  `;
+  wrap.appendChild(row);
+}
+
+// ==== マイルストーンリスト ====
+function renderMilestoneRows(rows){
+  const wrap = document.getElementById('milestoneList');
+  wrap.innerHTML = '';
+  if(rows.length === 0) rows = [{date:'',content:'',done:false}];
+  rows.forEach(r => addMilestoneRow(r.date, r.content, r.done));
+}
+function addMilestoneRow(date='', content='', done=false){
+  const wrap = document.getElementById('milestoneList');
+  const row = document.createElement('div');
+  row.className = 'repeat-row';
+  row.innerHTML = `
+    <input type="checkbox" class="ms-done" ${done?'checked':''}>
+    <input type="date" class="ms-date" value="${date||''}" style="max-width:140px;">
+    <input type="text" placeholder="内容（例：自治体へヒアリング）" class="ms-content" value="${escapeHtml(content)}">
+    <button class="del-row" onclick="this.parentElement.remove()">×</button>
+  `;
+  wrap.appendChild(row);
+}
+
+// ==== 改版ログ ====
+function renderLogList(logs){
+  const wrap = document.getElementById('logList');
+  wrap.innerHTML = '';
+  if(logs.length === 0){
+    wrap.innerHTML = '<div class="gps-status">まだログはありません</div>';
+    return;
+  }
+  [...logs].reverse().forEach(l => {
+    const div = document.createElement('div');
+    div.className = 'log-item';
+    div.innerHTML = `<span class="log-date">${l.date}</span>${escapeHtml(l.content)}`;
+    wrap.appendChild(div);
+  });
+}
+
+// ==== GPS取得 ====
+function getLocation(){
+  const status = document.getElementById('gpsStatus');
+  if(!navigator.geolocation){
+    status.textContent = '位置情報がこの端末では利用できません';
+    return;
+  }
+  status.textContent = '取得中...';
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const {latitude, longitude} = pos.coords;
+    try{
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=ja&zoom=12`);
+      const data = await res.json();
+      const a = data.address || {};
+      const city = a.city || a.town || a.village || a.county || a.municipality || '';
+      const pref = a.state || '';
+      const name = [pref, city].filter(Boolean).join('');
+      document.getElementById('f-location').value = name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      status.textContent = '取得しました';
+    }catch(e){
+      document.getElementById('f-location').value = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      status.textContent = '市町村名の取得に失敗（座標のみ設定）';
+    }
+  }, err => {
+    status.textContent = '位置情報の取得に失敗しました：' + err.message;
+  }, {enableHighAccuracy:true, timeout:10000});
+}
+
+// ==== 保存・削除 ====
+function saveIdea(){
+  const title = document.getElementById('f-title').value.trim();
+  if(!title){
+    alert('タイトルを入力してください');
+    return;
+  }
+
+  const info = [...document.querySelectorAll('#infoList .repeat-row')].map(r => ({
+    info: r.querySelector('.info-info').value.trim(),
+    owner: r.querySelector('.info-owner').value.trim()
+  })).filter(r => r.info || r.owner);
+
+  const milestones = [...document.querySelectorAll('#milestoneList .repeat-row')].map(r => ({
+    date: r.querySelector('.ms-date').value,
+    content: r.querySelector('.ms-content').value.trim(),
+    done: r.querySelector('.ms-done').checked
+  })).filter(r => r.date || r.content);
+
+  const existing = editingId ? (ideas[editingId] || {}) : {};
+  const logs = existing.logs || [];
+  const newLogText = document.getElementById('f-newlog').value.trim();
+  if(newLogText){
+    logs.push({date: new Date().toISOString().slice(0,10), content: newLogText});
+  } else if(!editingId){
+    logs.push({date: new Date().toISOString().slice(0,10), content: '新規登録'});
+  }
+
+  const data = {
+    title,
+    status: document.getElementById('f-status').value,
+    datetime: document.getElementById('f-datetime').value,
+    location: document.getElementById('f-location').value.trim(),
+    elemA: document.getElementById('f-elemA').value.trim(),
+    elemB: document.getElementById('f-elemB').value.trim(),
+    target: document.getElementById('f-target').value.trim(),
+    value: document.getElementById('f-value').value.trim(),
+    info,
+    milestones,
+    logs
+  };
+
+  const id = editingId || uid();
+  ideas[id] = data;
+
+  if(useLocalStorage){
+    saveLocal();
+    render();
+  } else {
+    db.ref(DB_PATH + '/' + id).set(data);
+  }
+  closeModal();
+}
+
+function deleteIdea(){
+  if(!editingId) return;
+  if(!confirm('このアイデアを削除しますか？')) return;
+  if(useLocalStorage){
+    delete ideas[editingId];
+    saveLocal();
+    render();
+  } else {
+    db.ref(DB_PATH + '/' + editingId).remove();
+  }
+  closeModal();
+}
+
+document.getElementById('searchInput').addEventListener('input', render);
+document.getElementById('statusFilter').addEventListener('change', render);
+
+initFirebase();
+</script>
+</body>
+</html>
