@@ -190,6 +190,16 @@
 </head>
 <body>
 
+<div id="loginGate" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border-radius:16px;max-width:340px;width:88%;padding:36px 24px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+    <div style="font-size:40px;margin-bottom:10px;">💡</div>
+    <h3 style="margin:0 0 6px;color:var(--text);">アイデア箱</h3>
+    <p style="font-size:12.5px;color:var(--text-sub);margin:0 0 24px;line-height:1.7;">ご本人のGoogleアカウントでログインしてください</p>
+    <button type="button" id="googleLoginBtn" style="width:100%;padding:12px;font-size:14px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;">Googleでログイン</button>
+    <p id="loginError" style="font-size:11.5px;color:var(--red);margin:14px 0 0;line-height:1.6;"></p>
+  </div>
+</div>
+
 <header>
   <h1>💡 アイデア箱</h1>
   <p>ふと思いついたビジネスアイデアをストックする</p>
@@ -305,6 +315,7 @@ const firebaseConfig = {
   appId: "1:790653257684:web:dd84bf5e0a38db328f3841"
 };
 const DB_PATH = 'ideabox'; // セキュリティルールのノード名に合わせる
+const ALLOWED_EMAIL = 'sasaki0369@gmail.com';
 
 let db = null;
 let ideas = {};
@@ -315,19 +326,42 @@ function initFirebase(){
   try{
     firebase.initializeApp(firebaseConfig);
     db = firebase.database();
-    firebase.auth().signInAnonymously().catch(err => {
-      console.warn("匿名認証に失敗したためローカル保存モードで動作します", err);
-      useLocalStorage = true;
-      loadLocal();
-      render();
-    });
+    let authReady = false;
     firebase.auth().onAuthStateChanged(user => {
-      if(user && !useLocalStorage){
-        db.ref(DB_PATH).on('value', snap => {
-          ideas = snap.val() || {};
-          render();
-        });
+      if(user && user.email !== ALLOWED_EMAIL){
+        firebase.auth().signOut();
+        document.getElementById('loginError').textContent = 'このアプリは指定されたアカウントのみ利用できます。';
+        document.getElementById('loginGate').style.display = 'flex';
+        return;
       }
+      if(user){
+        document.getElementById('loginGate').style.display = 'none';
+        if(!authReady){
+          authReady = true;
+          db.ref(DB_PATH).on('value', snap => {
+            ideas = snap.val() || {};
+            render();
+          });
+        }
+      }else{
+        document.getElementById('loginGate').style.display = 'flex';
+      }
+    });
+    firebase.auth().getRedirectResult().catch(err => {
+      console.warn('Google redirect sign-in failed', err);
+      document.getElementById('loginError').textContent = 'ログインに失敗しました（'+(err && err.code ? err.code : err)+'）';
+    });
+    document.getElementById('googleLoginBtn').addEventListener('click', () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      document.getElementById('loginError').textContent = '';
+      firebase.auth().signInWithPopup(provider).catch(err => {
+        if(err && (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request' || err.code === 'auth/operation-not-supported-in-this-environment')){
+          firebase.auth().signInWithRedirect(provider);
+        }else{
+          console.warn('Google sign-in failed', err);
+          document.getElementById('loginError').textContent = 'ログインに失敗しました（'+(err && err.code ? err.code : err)+'）';
+        }
+      });
     });
   }catch(e){
     console.warn("Firebase初期化に失敗したためローカル保存モードで動作します", e);
